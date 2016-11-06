@@ -48,7 +48,7 @@ module.exports = function(app) {
     debug("starting...")
 
     //sendCommand(app, { "action": "changeHeading", "value": 10 })
-    sendCommand(app, { "action": "advanceWaypoint" })
+    sendCommand(app, props.devicid, { "action": "advanceWaypoint" })
     debug("started")
   };
 
@@ -68,13 +68,13 @@ module.exports = function(app) {
     title: "Raymarine Autopilot Control",
     type: "object",
     required: [
-      "radius"
+      "deviceid"
     ],
     properties: {
-      radius: {
+      deviceid: {
         type: "string",
-        title: "Radius (m)",
-        default: "60"
+        title: "Autopilot N2K Device ID ",
+        default: "204"
       }
     }
   }
@@ -89,7 +89,7 @@ function padd(n, p, c)
   return (pad + n).slice(-pad.length);
 }
 
-function changeHeading(app, command_json)
+function changeHeading(app, deviceid, command_json)
 {
   var ammount = command_json["value"]
   var state = _.get(app.signalk.self, state_path)
@@ -128,37 +128,37 @@ function changeHeading(app, command_json)
   return n2k_msgs
 }
 
-function setState(app, command_json)
+function setState(app, deviceid, command_json)
 {
   var state = command_json["value"]
   debug("setState: " + state)
-  return [util.format(state_commands[state], (new Date()).toISOString(), default_src, autopilot_dst)]
+  return [util.format(state_commands[state], (new Date()).toISOString(), default_src, deviceid)]
 }
 
-function advanceWaypoint(app, command_json)
+function advanceWaypoint(app, deviceid, command_json)
 {
   return [util.format(raymarine_ttw_Mode, (new Date()).toISOString(),
                       default_src, autopilot_dst),
           util.format(raymarine_ttw, (new Date()).toISOString(),
-                      default_src, autopilot_dst)]
+                      default_src, deviceid)]
 }
 
-function sendCommand(app, command_json)
+function sendCommand(app, deviceid, command_json)
 {
   var n2k_msgs = null
   var action = command_json["action"]
   debug("action: " + action)
   if ( action === "setState" )
   {
-    n2k_msgs = setState(app, command_json)
+    n2k_msgs = setState(app, deviceid, command_json)
   }
   else if ( action === "changeHeading" )
   {
-    n2k_msgs = changeHeading(app, command_json)
+    n2k_msgs = changeHeading(app, deviceid, command_json)
   }
   else if ( action === 'advanceWaypoint' )
   {
-    n2k_msgs = advanceWaypoint(app, command_json)
+    n2k_msgs = advanceWaypoint(app, deviceid, command_json)
   }
   if ( n2k_msgs )
   {

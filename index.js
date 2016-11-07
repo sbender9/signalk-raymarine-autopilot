@@ -19,7 +19,7 @@ const Bacon = require('baconjs');
 
 const util = require('util')
 
-_ = require('lodash')
+const _ = require('lodash')
 
 const state_commands = {
     "auto":    "%s,3,126208,%s,%s,17,01,63,ff,00,f8,04,01,3b,07,03,04,04,40,00,05,ff,ff",

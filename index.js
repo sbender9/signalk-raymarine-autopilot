@@ -47,8 +47,8 @@ module.exports = function(app) {
   plugin.start = function(props) {
     debug("starting...")
 
-    //sendCommand(app, { "action": "changeHeading", "value": 10 })
-    sendCommand(app, props.devicid, { "action": "advanceWaypoint" })
+    sendCommand(app, props.devicid, { "action": "changeHeading", "value": 10 })
+    //sendCommand(app, props.devicid, { "action": "advanceWaypoint" })
     debug("started")
   };
 
@@ -163,7 +163,7 @@ function sendCommand(app, deviceid, command_json)
   if ( n2k_msgs )
   {
     debug("n2k_msg: " + n2k_msgs)
-    n2k_msgs.map(function(msg) { app.emit('nmea2000out', msg)})
+    n2k_msgs.map(function(msg) { app.signalk.emit('nmea2000out', msg)})
   }
 }
 

@@ -43,15 +43,19 @@ const state_path = "steering.autopilot.state.value"
 module.exports = function(app) {
   var unsubscribe = undefined
   var plugin = {}
+  var deviceid
   
   plugin.start = function(props) {
     debug("starting...")
-
-    sendCommand(app, props.devicid, { "action": "changeHeading", "value": 10 })
-    //sendCommand(app, props.devicid, { "action": "advanceWaypoint" })
+    deviceid = props.deviceid
     debug("started")
   };
 
+  plugin.executeCommand = function(json) {
+    debug("executeCommand: " + util.inspect(json, {showHidden: false, depth: null}))
+    sendCommand(app, deviceid, json)
+  }
+  
   plugin.stop = function() {
     debug("stopping")
     if (unsubscribe) {
@@ -148,15 +152,15 @@ function sendCommand(app, deviceid, command_json)
   var n2k_msgs = null
   var action = command_json["action"]
   debug("action: " + action)
-  if ( action === "setState" )
+  if ( action == "setState" )
   {
     n2k_msgs = setState(app, deviceid, command_json)
   }
-  else if ( action === "changeHeading" )
+  else if ( action == "changeHeading" )
   {
     n2k_msgs = changeHeading(app, deviceid, command_json)
   }
-  else if ( action === 'advanceWaypoint' )
+  else if ( action == 'advanceWaypoint' )
   {
     n2k_msgs = advanceWaypoint(app, deviceid, command_json)
   }

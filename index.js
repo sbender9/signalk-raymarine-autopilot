@@ -167,7 +167,7 @@ function sendCommand(app, deviceid, command_json)
   if ( n2k_msgs )
   {
     debug("n2k_msg: " + n2k_msgs)
-    n2k_msgs.map(function(msg) { app.signalk.emit('nmea2000out', msg)})
+    n2k_msgs.map(function(msg) { app.emit('nmea2000out', msg)})
   }
 }
 

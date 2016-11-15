@@ -51,10 +51,12 @@ module.exports = function(app) {
     debug("started")
   };
 
-  plugin.executeCommand = function(json) {
-    debug("executeCommand: " + util.inspect(json, {showHidden: false, depth: null}))
-    sendCommand(app, deviceid, json)
-  }
+  plugin.registerWithRouter = function(router) {
+    router.post("/command", (req, res) => {
+      sendCommand(app, deviceid, req.body)
+      res.send("Executed command for plugin " + plugin.id)
+    })
+  }  
   
   plugin.stop = function() {
     debug("stopping")

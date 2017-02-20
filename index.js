@@ -158,7 +158,7 @@ function advanceWaypoint(app, deviceid, command_json)
 function silenceAlarm(app, deviceid, command_json)
 {
   return [ util.format(raymarine_silence, (new Date()).toISOString(),
-                     default_src, deviceid, padd(command_json.value.alarmId.toString(16),2),
+                     deviceid, padd(command_json.value.alarmId.toString(16),2),
                      padd(command_json.value.groupId.toString(16),2)) ]
 }
 

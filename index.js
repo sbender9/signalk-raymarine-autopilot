@@ -32,6 +32,8 @@ const wind_direction_command = "%s,3,126208,%s,%s,14,01,41,ff,00,f8,03,01,3b,07,
 const raymarine_ttw_Mode = "%s,3,126208,%s,%s,17,01,63,ff,00,f8,04,01,3b,07,03,04,04,81,01,05,ff,ff"
 const raymarine_ttw = "%s,3,126208,%s,%s,21,00,00,ef,01,ff,ff,ff,ff,ff,ff,04,01,3b,07,03,04,04,6c,05,1a,50"
 
+const raymarine_silence =  "%s,7,65361,%s,255,8,3b,9f,%s,%sx,ff,ff,ff,ff"
+
 const default_src = '1'
 const autopilot_dst = '204'
 const everyone_dst = '255'
@@ -46,15 +48,18 @@ module.exports = function(app) {
   var deviceid
   
   plugin.start = function(props) {
-    debug("starting...")
+    debug("starting: " + props.deviceid)
     deviceid = props.deviceid
     debug("started")
   };
 
   plugin.registerWithRouter = function(router) {
     router.post("/command", (req, res) => {
-      sendCommand(app, deviceid, req.body)
-      res.send("Executed command for plugin " + plugin.id)
+      if ( typeof deviceid != "undefined" )
+      {
+        sendCommand(app, deviceid, req.body)
+        res.send("Executed command for plugin " + plugin.id)
+      }
     })
   }  
   
@@ -108,6 +113,7 @@ function changeHeading(app, deviceid, command_json)
   {
     var current = _.get(app.signalk.self, target_heading_path)
     new_value = radsToDeg(current) + ammount
+    debug("new heading: " + new_value)
     command_format = heading_command
   }
   else if ( state == "wind" )
@@ -144,16 +150,23 @@ function setState(app, deviceid, command_json)
 function advanceWaypoint(app, deviceid, command_json)
 {
   return [util.format(raymarine_ttw_Mode, (new Date()).toISOString(),
-                      default_src, autopilot_dst),
+                      default_src, deviceid),
           util.format(raymarine_ttw, (new Date()).toISOString(),
                       default_src, deviceid)]
+}
+
+function silenceAlarm(app, deviceid, command_json)
+{
+  return [ util.format(raymarine_silence, (new Date()).toISOString(),
+                     default_src, deviceid, padd(command_json.value.alarmId.toString(16),2),
+                     padd(command_json.value.groupId.toString(16),2)) ]
 }
 
 function sendCommand(app, deviceid, command_json)
 {
   var n2k_msgs = null
   var action = command_json["action"]
-  debug("action: " + action)
+  debug("command: " + util.inspect(command_json, {showHidden: false, depth: 3}))
   if ( action == "setState" )
   {
     n2k_msgs = setState(app, deviceid, command_json)
@@ -165,6 +178,10 @@ function sendCommand(app, deviceid, command_json)
   else if ( action == 'advanceWaypoint' )
   {
     n2k_msgs = advanceWaypoint(app, deviceid, command_json)
+  }
+  else if ( action == "silenceAlarm" )
+  {
+    n2k_msgs = silenceAlarm(app, deviceid, command_json)
   }
   if ( n2k_msgs )
   {

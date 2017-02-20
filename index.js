@@ -32,7 +32,7 @@ const wind_direction_command = "%s,3,126208,%s,%s,14,01,41,ff,00,f8,03,01,3b,07,
 const raymarine_ttw_Mode = "%s,3,126208,%s,%s,17,01,63,ff,00,f8,04,01,3b,07,03,04,04,81,01,05,ff,ff"
 const raymarine_ttw = "%s,3,126208,%s,%s,21,00,00,ef,01,ff,ff,ff,ff,ff,ff,04,01,3b,07,03,04,04,6c,05,1a,50"
 
-const raymarine_silence =  "%s,7,65361,%s,255,8,3b,9f,%s,%sx,ff,ff,ff,ff"
+const raymarine_silence =  "%s,7,65361,%s,255,8,3b,9f,%s,%s,ff,ff,ff,ff"
 
 const default_src = '1'
 const autopilot_dst = '204'

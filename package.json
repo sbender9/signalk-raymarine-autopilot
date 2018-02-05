@@ -4,7 +4,7 @@
   "description": "Plugin that controls a Raymarine autopilot",
   "main": "index.js",
   "scripts": {
-    "test": "$NODE $npm_package_main"  
+    "test": "$NODE $npm_package_main"
   },
   "keywords": [
     "signalk-node-server-plugin"
@@ -13,11 +13,10 @@
   "license": "ISC",
   "dependencies": {
     "baconjs": "^0.7.88",
-    "debug": "^3.1.0",
     "lodash": "^4.17.4"
   },
-   "repository": {
-    "type" : "git",
-    "url" : "https://github.com/sbender9/signalk-raymarine-autopilot"
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/sbender9/signalk-raymarine-autopilot"
   }
 }

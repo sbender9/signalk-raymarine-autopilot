@@ -13,12 +13,8 @@
  * limitations under the License.
  */
 
-const debug = require('debug')('raymarine-autopilot')
-
 const Bacon = require('baconjs');
-
 const util = require('util')
-
 const _ = require('lodash')
 
 const state_commands = {
@@ -32,7 +28,7 @@ const wind_direction_command = "%s,3,126208,%s,%s,14,01,41,ff,00,f8,03,01,3b,07,
 const raymarine_ttw_Mode = "%s,3,126208,%s,%s,17,01,63,ff,00,f8,04,01,3b,07,03,04,04,81,01,05,ff,ff"
 const raymarine_ttw = "%s,3,126208,%s,%s,21,00,00,ef,01,ff,ff,ff,ff,ff,ff,04,01,3b,07,03,04,04,6c,05,1a,50"
 
-const raymarine_silence =  "%s,7,65361,%s,255,8,3b,9f,%s,%s,ff,ff,ff,ff"
+const raymarine_silence =  "%s,7,65361,%s,255,8,3b,9f,%s,%s,00,00,00,00"
 
 const default_src = '1'
 const autopilot_dst = '204'
@@ -48,9 +44,7 @@ module.exports = function(app) {
   var deviceid
   
   plugin.start = function(props) {
-    debug("starting: " + props.deviceid)
     deviceid = props.deviceid
-    debug("started")
   };
 
   plugin.registerWithRouter = function(router) {
@@ -64,11 +58,9 @@ module.exports = function(app) {
   }  
   
   plugin.stop = function() {
-    debug("stopping")
     if (unsubscribe) {
       unsubscribe()
     }
-    debug("stopped")
   }
   
   plugin.id = "raymarineautopilot"
@@ -103,23 +95,23 @@ function padd(n, p, c)
 function changeHeading(app, deviceid, command_json)
 {
   var ammount = command_json["value"]
-  var state = _.get(app.signalk.self, state_path)
+  var state = app.getSelfPath(state_path)
   var new_value
   var command_format
   var n2k_msgs
   
-  debug("changeHeading: " + state + " " + ammount)
+  app.debug("changeHeading: " + state + " " + ammount)
   if ( state == "auto" )
   {
-    var current = _.get(app.signalk.self, target_heading_path)
+    var current = app.getSelfPath(target_heading_path)
     new_value = radsToDeg(current) + ammount
-    debug("new heading: " + new_value)
+    app.debug("new heading: " + new_value)
     command_format = heading_command
   }
   else if ( state == "wind" )
   {
-    var current = _.get(app.signalk.self, target_wind_path)
-    debug("current wind angle: " + current)
+    var current = app.getSelfPath(target_wind_path)
+    app.debug("current wind angle: " + current)
     new_value = radsToDeg(current)
     
     if ( new_value < 0 )
@@ -143,7 +135,7 @@ function changeHeading(app, deviceid, command_json)
 function setState(app, deviceid, command_json)
 {
   var state = command_json["value"]
-  debug("setState: " + state)
+  app.debug("setState: " + state)
   return [util.format(state_commands[state], (new Date()).toISOString(), default_src, deviceid)]
 }
 
@@ -158,7 +150,7 @@ function advanceWaypoint(app, deviceid, command_json)
 function silenceAlarm(app, deviceid, command_json)
 {
   return [ util.format(raymarine_silence, (new Date()).toISOString(),
-                     deviceid, padd(command_json.value.alarmId.toString(16),2),
+                     default_src, padd(command_json.value.alarmId.toString(16),2),
                      padd(command_json.value.groupId.toString(16),2)) ]
 }
 
@@ -166,7 +158,7 @@ function sendCommand(app, deviceid, command_json)
 {
   var n2k_msgs = null
   var action = command_json["action"]
-  debug("command: " + util.inspect(command_json, {showHidden: false, depth: 3}))
+  app.debug("command: %j", command_json)
   if ( action == "setState" )
   {
     n2k_msgs = setState(app, deviceid, command_json)
@@ -185,7 +177,7 @@ function sendCommand(app, deviceid, command_json)
   }
   if ( n2k_msgs )
   {
-    debug("n2k_msg: " + n2k_msgs)
+    app.debug("n2k_msg: " + n2k_msgs)
     n2k_msgs.map(function(msg) { app.emit('nmea2000out', msg)})
   }
 }

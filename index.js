@@ -105,20 +105,30 @@ function changeHeading(app, deviceid, command_json)
   {
     var current = app.getSelfPath(target_heading_path)
     new_value = radsToDeg(current) + ammount
-    app.debug("new heading: " + new_value)
+
+    if ( new_value < 0 ) {
+      new_value = 360 + new_value
+    } else if ( new_value > 360 ) {
+      new_value = new_value - 360
+    }
+    
+    app.debug(`current heading: ${radsToDeg(current)} new value: ${new_value}`)
+
     command_format = heading_command
   }
   else if ( state == "wind" )
   {
     var current = app.getSelfPath(target_wind_path)
-    app.debug("current wind angle: " + current)
-    new_value = radsToDeg(current)
+    new_value = radsToDeg(current) + ammount
     
     if ( new_value < 0 )
       new_value = 360 + new_value
-    new_value += ammount
+    else if ( new_value > 360 )
+      new_value = new_value - 360
+
+    app.debug(`current wind angle: ${radsToDeg(current)} new value: ${new_value}`)
     command_format = wind_direction_command
-    }
+  }
   else
   {
     //error

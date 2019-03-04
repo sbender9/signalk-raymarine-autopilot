@@ -30,6 +30,9 @@ const raymarine_ttw = "%s,3,126208,%s,%s,21,00,00,ef,01,ff,ff,ff,ff,ff,ff,04,01,
 
 const raymarine_silence =  "%s,7,65361,%s,255,8,3b,9f,%s,%s,00,00,00,00"
 
+const keep_alive = "%s,7,65384,%s,255,8,3b,9f,00,00,00,00,00,00"
+const keep_alive2 = "%s,7,126720,%s,255,7,3b,9f,f0,81,90,00,03"
+
 const default_src = '1'
 const autopilot_dst = '204'
 const everyone_dst = '255'
@@ -42,9 +45,25 @@ module.exports = function(app) {
   var unsubscribe = undefined
   var plugin = {}
   var deviceid
+  var timers = []
   
   plugin.start = function(props) {
     deviceid = props.deviceid
+
+    if ( props.controlHead ) {
+      timers.push(setInterval(() => {
+        const msg = util.format(keep_alive, (new Date()).toISOString(),
+                                default_src)
+        app.emit('nmea2000out', msg)
+      }, 1000))
+      
+      timers.push(setInterval(() => {
+        const msg = util.format(keep_alive2, (new Date()).toISOString(),
+                                default_src)
+        console.log('sending keep_alive: ' + msg)
+        app.emit('nmea2000out', msg)
+      }, 2000))
+    }
   };
 
   plugin.registerWithRouter = function(router) {
@@ -58,6 +77,9 @@ module.exports = function(app) {
   }  
   
   plugin.stop = function() {
+    timers.forEach(timer => {
+      clearInterval(timer)
+    })
     if (unsubscribe) {
       unsubscribe()
     }
@@ -78,6 +100,11 @@ module.exports = function(app) {
         type: "string",
         title: "Autopilot N2K Device ID ",
         default: "204"
+      },
+      controlHead: {
+        type: 'boolean',
+        title: 'Act as the p70 control head',
+        default: false
       }
     }
   }

@@ -103,7 +103,7 @@ module.exports = function(app) {
       },
       controlHead: {
         type: 'boolean',
-        title: 'Act as the p70 control head',
+        title: 'Act as the p70 control head (WARNING: unknown consequences)',
         default: false
       }
     }

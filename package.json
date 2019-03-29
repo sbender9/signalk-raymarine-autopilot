@@ -12,7 +12,7 @@
   "author": "scott@scottbender.net",
   "license": "ISC",
   "dependencies": {
-    "baconjs": "^0.7.88",
+    "baconjs": "^3.0.0",
     "lodash": "^4.17.4"
   },
   "repository": {

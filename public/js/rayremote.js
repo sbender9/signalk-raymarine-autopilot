@@ -23,7 +23,8 @@ const commands = {
   "-1":      '{"action":"changeHeadingByKey","value":"-1"}',
   "-10":     '{"action":"changeHeadingByKey","value":"-10"}',
   "tackToPort":   '{"action":"tackTo","value":"port"}',
-  "tackToStarboard":   '{"action":"tackTo","value":"starboard"}'
+  "tackToStarboard":   '{"action":"tackTo","value":"starboard"}',
+  "advanceWaypoint":   '{"action":"advanceWaypoint"}'
 }
 
 var notificationsArray = {};
@@ -38,14 +39,14 @@ var handlePilotStatusTimeout = null;
 var handleHeadindValueTimeout = null;
 var handleReceiveTimeout = null;
 var handleSilenceScreenTimeout = null;
-var handleConfirmTackTimeout = null;
+var handleConfirmActionTimeout = null;
 var handleCountDownCounterTimeout = null;
 var connected = false;
 var reconnect = true;
 const timeoutReconnect = 2000;
 const timeoutValue = 2000;
 const timeoutBlink = 500;
-//const noDataMessage = 'NO DATA';
+const countDownDefault = 5;
 const noDataMessage = '-- -- -- --';
 var pilotStatusDiv = undefined;
 var headingValueDiv = undefined;
@@ -60,10 +61,11 @@ var notificationCounterDiv = undefined;
 var notificationCounterTextDiv = undefined;
 var silenceScreenDiv = undefined;
 var silenceScreenText = undefined;
-var tackScreenDiv = undefined;
+var confirmScreenDiv = undefined;
 var skPathToAck = '';
-var tackConfirmed = false;
+var actionToBeConfirmed = '';
 var countDownValue = 0;
+var pilotStatus = '';
 
 var startUpRayRemote = function() {
   pilotStatusDiv = document.getElementById('pilotStatus');
@@ -78,7 +80,7 @@ var startUpRayRemote = function() {
   notificationCounterTextDiv = document.getElementById('notificationCounterText');
   silenceScreenDiv = document.getElementById('silenceScreen');
   silenceScreenTextDiv = document.getElementById('silenceScreenText');
-  tackScreenDiv = document.getElementById('tackScreen');
+  confirmScreenDiv = document.getElementById('confirmScreen');
   countDownCounterDiv = document.getElementById('countDownCounter');
   setPilotStatus(noDataMessage);
   setHeadindValue(noDataMessage);
@@ -100,31 +102,38 @@ var demo = function () {
   setNotificationMessage({"path":"notifications.autopilot.PilotWarningWindShift","value":{"state":"alarm","message":"Pilot Warning Wind Shift"}});
   powerOffIconDiv.style.visibility = 'hidden';
   powerOnIconDiv.style.visibility = 'visible';
-  countDownCounterDiv.innerHTML = '5';
+  countDownCounterDiv.innerHTML = countDownDefault.toString();
 }
 
 var buildAndSendCommand = function(cmd) {
   var cmdJson = commands[cmd];
-  if (((cmd === 'tackToPort')||(cmd === 'tackToStarboard')) && (tackConfirmed === false)) {
+  if (typeof cmdJson === 'undefined') {
+    alert('Unknown command !');
+    return null;
+  }
+  if ((actionToBeConfirmed !== '')&&(actionToBeConfirmed !== cmd)) {
+    clearConfirmCmd();
+  }
+  if (((cmd === 'tackToPort')||(cmd === 'tackToStarboard'))&&(actionToBeConfirmed === '')) {
     confirmTack(cmd);
     return null;
   }
-  if (typeof cmdJson !== 'undefined') {
-    if ((cmd === 'tackToPort')||(cmd === 'tackToStarboard')) {
-      countDownValue = 0;
-      updateCountDownCounter();
-      sendCommand(commands['auto']);
-    }
-    sendCommand(cmdJson);
-  } else {
-      alert('Unknown command !')
-    }
-  if (tackConfirmed) {
-    clearTimeout(handleConfirmTackTimeout);
-    tackScreenDiv.style.visibility = 'hidden';
-    tackScreenDiv.innerHTML = '';
-    tackConfirmed = false;
+  if ((cmd === 'route')&&(pilotStatus === 'route')&&(actionToBeConfirmed === '')) {
+    confirmAdvanceWaypoint(cmd);
+    return null;
   }
+  if (actionToBeConfirmed === cmd) {
+    clearConfirmCmd();
+    if ((cmd === 'tackToPort')||(cmd === 'tackToStarboard')) {
+      sendCommand(commands['auto']); // force mode 'auto' to take a tack
+      sendCommand(cmdJson);
+    }
+    if ((cmd === 'route')&&(pilotStatus === 'route')) {
+      sendCommand(commands['advanceWaypoint']);
+    }
+    return null;
+  }
+  sendCommand(cmdJson);
 }
 
 var sendCommand = function(cmdJson) {
@@ -168,7 +177,7 @@ var notificationToValue = function (skPathToAck) {
 var sendSilence = function() {
   if (silenceScreenDiv.style.visibility !== 'visible') {
     silenceScreenDiv.style.visibility = 'visible';
-    autoHhideSilenceScreen();
+    autoHideSilenceScreen();
     if ((Object.keys(notificationsArray).length > 0) && (skPathToAck === '')) {
       skPathToAck = Object.keys(notificationsArray)[0];
     }
@@ -184,7 +193,7 @@ var sendSilence = function() {
 }
 
 var notificationScroll = function() {
-  autoHhideSilenceScreen();
+  autoHideSilenceScreen();
   if (silenceScreenDiv.style.visibility !== 'visible') {
     silenceScreenDiv.style.visibility = 'visible';
     if ((Object.keys(notificationsArray).length > 0) && (skPathToAck === '')) {
@@ -196,8 +205,8 @@ var notificationScroll = function() {
   silenceScreenTextDiv.innerHTML = notificationToValue(skPathToAck);
 }
 
-var autoHhideSilenceScreen = function() {
-  countDownValue = 5;
+var autoHideSilenceScreen = function() {
+  countDownValue = countDownDefault;
   updateCountDownCounter();
   clearTimeout(handleSilenceScreenTimeout);
   handleSilenceScreenTimeout = setTimeout(() => {
@@ -227,26 +236,47 @@ var getNextNotification = function(skPath) {
 
 var confirmTack = function(cmd) {
   var message = 'Repeat same key<br>to confirm<br>tack to ';
-  tackConfirmed = true;
   if (cmd === 'tackToPort') {
     message += 'port';
+    actionToBeConfirmed = cmd;
   } else if (cmd === 'tackToStarboard') {
       message += 'starboard';
+      actionToBeConfirmed = cmd;
     } else {
-        tackConfirmed = false;
+        actionToBeConfirmed = '';
         return null;
       }
-  countDownValue = 5;
-  updateCountDownCounter();
-  tackScreenDiv.innerHTML = '<p>' + message + '</p>';
-  tackScreenDiv.style.visibility = 'visible';
-  clearTimeout(handleConfirmTackTimeout);
-  handleConfirmTackTimeout = setTimeout(() => {
-    tackScreenDiv.style.visibility = 'hidden';
-    tackScreenDiv.innerHTML = '';
-    tackConfirmed = false;
-  }, 5000);
+  startConfirmCmd(cmd, message);
+}
 
+var confirmAdvanceWaypoint = function(cmd) {
+  var message = 'Repeat key TRACK<br>to confirm<br>Advance Waypoint';
+  startConfirmCmd(cmd, message);
+}
+
+var startConfirmCmd = function (cmd, message) {
+  countDownValue = countDownDefault;
+  actionToBeConfirmed = cmd;
+  updateCountDownCounter();
+  confirmScreenDiv.innerHTML = '<p>' + message + '</p>';
+  confirmScreenDiv.style.visibility = 'visible';
+  clearTimeout(handleConfirmActionTimeout);
+  handleConfirmActionTimeout = setTimeout(() => {
+    confirmScreenDiv.style.visibility = 'hidden';
+    confirmScreenDiv.innerHTML = '';
+    actionToBeConfirmed = '';
+  }, 5000);
+}
+
+var clearConfirmCmd = function () {
+  clearTimeout(handleConfirmActionTimeout);
+  clearTimeout(handleCountDownCounterTimeout);
+  countDownValue = -1;
+  countDownCounterDiv.innerHTML = '';
+  confirmScreenDiv.style.visibility = 'hidden';
+  confirmScreenDiv.innerHTML = '';
+  actionToBeConfirmed = '';
+  cmdConfirmed = false;
 }
 
 var wsConnect = function() {
@@ -353,6 +383,7 @@ var setPilotStatus = function(value) {
     value = noDataMessage;
   }
   pilotStatusDiv.innerHTML = value;
+  pilotStatus = value;
 }
 
 var setNotificationMessage = function(value) {
@@ -411,7 +442,8 @@ var cleanOnClosed = function() {
   notificationCounterTextDiv.innerHTML = '';
   notificationsArray = {};
   skPathToAck = '';
-  tackConfirmed = false;
+  actionToBeConfirmed = '';
+  pilotStatus = '';
   clearTimeout(handleHeadindValueTimeout);
   clearTimeout(handlePilotStatusTimeout);
   setPilotStatus('');

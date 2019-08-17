@@ -36,7 +36,6 @@ var touchEnd = function(event) {
 
 var ws = null;
 var handlePilotStatusTimeout = null;
-var handleHeadindValueTimeout = null;
 var handleReceiveTimeout = null;
 var handleSilenceScreenTimeout = null;
 var handleConfirmActionTimeout = null;
@@ -44,7 +43,7 @@ var handleCountDownCounterTimeout = null;
 var connected = false;
 var reconnect = true;
 const timeoutReconnect = 2000;
-const timeoutValue = 2000;
+const timeoutValue = 3000;
 const timeoutBlink = 500;
 const countDownDefault = 5;
 const noDataMessage = '-- -- -- --';
@@ -52,6 +51,7 @@ var pilotStatusDiv = undefined;
 var headingValueDiv = undefined;
 var receiveIconDiv = undefined;
 var sendIconDiv = undefined;
+var typeValIconDiv = undefined;
 var errorIconDiv = undefined;
 var countDownCounterDiv = undefined;
 var powerOnIconDiv = undefined;
@@ -67,11 +67,46 @@ var actionToBeConfirmed = '';
 var countDownValue = 0;
 var pilotStatus = '';
 
+var displayByPathParams = {
+  'navigation.headingMagnetic': {
+    handleTimeout: null,
+    typeVal: 'Mag',
+    usage: ['wind', 'route', 'auto', 'standby'],
+    value: ''
+  },
+  'navigation.headingTrue': {
+    handleTimeout: null,
+    typeVal: 'True',
+    usage: ['wind', 'route', 'auto', 'standby'],
+    value: ''
+  },
+  'environment.wind.angleApparent': {
+    handleTimeout: null,
+    typeVal: 'AWA',
+    usage: ['wind'],
+    value: ''
+  },
+  'environment.wind.angleTrueWater': {
+    handleTimeout: null,
+    typeVal: 'TWA',
+    usage: ['wind'],
+    value: ''
+  }
+}
+
+var preferedDisplayMode = {
+  wind: 'environment.wind.angleApparent',
+  route: 'navigation.headingMagnetic',
+  auto: 'navigation.headingMagnetic',
+  standby: 'navigation.headingMagnetic'
+}
+
 var startUpRayRemote = function() {
   pilotStatusDiv = document.getElementById('pilotStatus');
   headingValueDiv = document.getElementById('headingValue');
   receiveIconDiv = document.getElementById('receiveIcon');
   sendIconDiv = document.getElementById('sendIcon');
+  typeValIconDiv = document.getElementById('typeValIcon');
   errorIconDiv = document.getElementById('errorIcon');
   powerOnIconDiv = document.getElementById('powerOnIcon');
   powerOffIconDiv = document.getElementById('powerOffIcon');
@@ -82,8 +117,20 @@ var startUpRayRemote = function() {
   silenceScreenTextDiv = document.getElementById('silenceScreenText');
   confirmScreenDiv = document.getElementById('confirmScreen');
   countDownCounterDiv = document.getElementById('countDownCounter');
-  setPilotStatus(noDataMessage);
-  setHeadindValue(noDataMessage);
+  setPilotStatus('');
+  setHeadindValue('');
+  var savedPreferedDisplayModeJSON = localStorage.getItem('signalk-raymarine-autopilot');
+  var savedPreferedDisplayMode = savedPreferedDisplayModeJSON && JSON.parse(savedPreferedDisplayModeJSON);
+  if (savedPreferedDisplayMode === null) {savedPreferedDisplayMode = {};}
+  savedPreferedDisplayMode = (typeof savedPreferedDisplayMode.preferedDisplayMode !== 'undefined') ? savedPreferedDisplayMode.preferedDisplayMode : {};
+  Object.keys(preferedDisplayMode).map( pilotMode => {
+    var pathForPilotMode = savedPreferedDisplayMode[pilotMode];
+    if ((typeof pathForPilotMode !== 'undefined') &&
+        (typeof displayByPathParams[pathForPilotMode] !== 'undefined') &&
+        displayByPathParams[pathForPilotMode].usage.includes(pilotMode)) {
+      preferedDisplayMode[pilotMode] = pathForPilotMode;
+    }
+  })
 //  demo(); return;
   setTimeout(() => {
     receiveIconDiv.style.visibility = 'hidden';
@@ -92,13 +139,16 @@ var startUpRayRemote = function() {
     bottomBarIconDiv.style.visibility = 'hidden';
     notificationCounterDiv.style.visibility = 'hidden';
     countDownCounterDiv.innerHTML = '';
+    typeValIconDiv.innerHTML = '';
     wsConnect();
   }, 1500);
 }
 
 var demo = function () {
-  setHeadindValue(100);
-  setPilotStatus('WIND');
+  var headingPath = 'environment.wind.angleTrueWater';
+  setPilotStatus('wind');
+  buildHeadindValue( headingPath, 1.74);
+  clearTimeout(displayByPathParams[headingPath].handleTimeout);
   setNotificationMessage({"path":"notifications.autopilot.PilotWarningWindShift","value":{"state":"alarm","message":"Pilot Warning Wind Shift"}});
   powerOffIconDiv.style.visibility = 'hidden';
   powerOnIconDiv.style.visibility = 'visible';
@@ -234,6 +284,24 @@ var getNextNotification = function(skPath) {
   return newSkPathToAck;
 }
 
+var changePreferedDisplayMode = function() {
+  const currentPilotStatus = pilotStatus;
+  const currentPreferedDisplayMode = preferedDisplayMode[currentPilotStatus];
+  var pathForPilotStatus = [];
+  if (typeof currentPreferedDisplayMode === 'undefined') {return null}
+  for (let [key, value] of Object.entries(displayByPathParams)) {
+   if ((typeof value.usage === 'object') && value.usage.includes(currentPilotStatus)) {
+     pathForPilotStatus.push(key);
+   }
+  }
+  const currentIndex = pathForPilotStatus.indexOf(currentPreferedDisplayMode);
+  const nextIndex = (currentIndex + 1) % pathForPilotStatus.length;
+  preferedDisplayMode[currentPilotStatus] = pathForPilotStatus[nextIndex];
+  localStorage.setItem('signalk-raymarine-autopilot', JSON.stringify({preferedDisplayMode: preferedDisplayMode}));
+  setHeadindValue(displayByPathParams[preferedDisplayMode[currentPilotStatus]].value);
+  typeValIconDiv.innerHTML = displayByPathParams[preferedDisplayMode[currentPilotStatus]].typeVal;
+}
+
 var confirmTack = function(cmd) {
   var message = 'Repeat same key<br>to confirm<br>tack to ';
   if (cmd === 'tackToPort') {
@@ -304,6 +372,21 @@ var wsConnect = function() {
               "minPeriod": 900
             },
             {
+              "path": "navigation.headingTrue",
+              "format": "delta",
+              "minPeriod": 900
+            },
+            {
+              "path": "environment.wind.angleApparent",
+              "format": "delta",
+              "minPeriod": 900
+            },
+            {
+              "path": "environment.wind.angleTrueWater",
+              "format": "delta",
+              "minPeriod": 900
+            },
+            {
               "path": "notifications.autopilot.*",
               "format": "delta",
               "minPeriod": 200
@@ -312,8 +395,6 @@ var wsConnect = function() {
         };
         var subscriptionMessage = JSON.stringify(subscriptionObject);
         ws.send(subscriptionMessage);
-        handlePilotStatusTimeout = setTimeout(() => {setPilotStatus(noDataMessage)}, timeoutValue);
-        handleHeadindValueTimeout = setTimeout(() => {setHeadindValue(noDataMessage)}, timeoutValue);
       }
 
       ws.onclose = function() {
@@ -356,14 +437,15 @@ var dispatchMessages = function(jsonData) {
         update.values.forEach((value) => {
           if (value.path === "steering.autopilot.state") {
             clearTimeout(handlePilotStatusTimeout);
-            handlePilotStatusTimeout = setTimeout(() => {setPilotStatus(noDataMessage)}, timeoutValue);
+            handlePilotStatusTimeout = setTimeout(() => {
+              console.log('timeout:'+pilotStatus);
+              setPilotStatus('');
+            }, timeoutValue);
             setPilotStatus(value.value);
-          } else if (value.path === "navigation.headingMagnetic") {
-            clearTimeout(handleHeadindValueTimeout);
-            handleHeadindValueTimeout = setTimeout(() => {setHeadindValue(noDataMessage)}, timeoutValue);
-            setHeadindValue(Math.round(value.value * (180/Math.PI)));
           } else if (value.path.startsWith("notifications.autopilot")) {
             setNotificationMessage(value);
+          } else {
+            buildHeadindValue(value.path, value.value);
           }
         });
       }
@@ -371,19 +453,46 @@ var dispatchMessages = function(jsonData) {
   }
 }
 
-var setHeadindValue = function(value) {
-  if (value !== '') {
-    value = ((typeof value === 'undefined') || isNaN(value)) ? noDataMessage : 'Mag:' + value + '&deg;';
+var buildHeadindValue = function(path, value) {
+  var displayByPathParam = displayByPathParams[path];
+
+  if (typeof displayByPathParam === 'undefined') {
+    console.log('unknown path:' + path);
+    return null;
   }
-  headingValueDiv.innerHTML = value;
+
+  value = Math.round(value * (180/Math.PI));
+  displayByPathParam.value = ((typeof value === 'undefined') || isNaN(value)) ? noDataMessage : ' ' + value + '&deg;';
+  clearTimeout(displayByPathParam.handleTimeout);
+  displayByPathParam.handleTimeout = setTimeout(() => {
+    displayByPathParams[path].value = noDataMessage;
+    console.log('timeout:{'+pilotStatus+'}['+path+']'+displayByPathParams[path].value);
+    if (preferedDisplayMode[pilotStatus] == path) {
+      setHeadindValue(displayByPathParams[path].value);
+    }
+  }, timeoutValue, path);
+  if (preferedDisplayMode[pilotStatus] == path) {
+    if (typeValIconDiv.innerHTML !== displayByPathParam.typeVal) {
+      typeValIconDiv.innerHTML = displayByPathParam.typeVal;
+    }
+    setHeadindValue(displayByPathParams[path].value);
+  }
+}
+
+var setHeadindValue = function(value) {
+  if (pilotStatus === '') { value = ''}
+  headingValueDiv.innerHTML = ((typeof value === 'undefined') || (value === '')) ? noDataMessage : value;
 }
 
 var setPilotStatus = function(value) {
   if (typeof value === 'undefined') {
-    value = noDataMessage;
+    value = '';
   }
-  pilotStatusDiv.innerHTML = value;
   pilotStatus = value;
+  if (value === '') {
+    setHeadindValue(noDataMessage);
+    pilotStatusDiv.innerHTML = noDataMessage;
+  } else { pilotStatusDiv.innerHTML = value;}
 }
 
 var setNotificationMessage = function(value) {
@@ -448,11 +557,15 @@ var cleanOnClosed = function() {
   notificationCounterDiv.style.visibility = 'hidden';
   silenceScreenDiv.style.visibility = 'hidden';
   notificationCounterTextDiv.innerHTML = '';
+  typeValIconDiv.innerHTML = '';
   notificationsArray = {};
   skPathToAck = '';
   actionToBeConfirmed = '';
   pilotStatus = '';
-  clearTimeout(handleHeadindValueTimeout);
+  Object.keys(displayByPathParams).map( path => {
+    clearTimeout(displayByPathParams[path].handleTimeout);
+    displayByPathParams[path].value = '';
+  });
   clearTimeout(handlePilotStatusTimeout);
   setPilotStatus('');
   setHeadindValue('');

@@ -391,6 +391,9 @@ var setNotificationMessage = function(value) {
     value.path = value.path.replace('notifications.', '');
     if (typeof value.value !== 'undefined') {
       if (value.value.state === 'normal') {
+        if (bottomBarIconDiv.innerHTML === notificationsArray[value.path]) {
+          bottomBarIconDiv.innerHTML = '';
+        }
         delete notificationsArray[value.path]
       } else {
           notificationsArray[value.path] = value.value.message.replace('Pilot', '');
@@ -403,9 +406,14 @@ var setNotificationMessage = function(value) {
   if (alarmsCount > 0) {
     notificationCounterTextDiv.innerHTML = alarmsCount;
     notificationCounterDiv.style.visibility = 'visible';
+    if (bottomBarIconDiv.innerHTML === '') {
+      bottomBarIconDiv.innerHTML = Object.keys(notificationsArray)[0];
+    }
   } else {
       notificationCounterTextDiv.innerHTML = '';
       notificationCounterDiv.style.visibility = 'hidden';
+      bottomBarIconDiv.style.visibility = 'hidden';
+      bottomBarIconDiv.innerHTML = '';
     }
 }
 
